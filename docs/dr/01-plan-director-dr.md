@@ -5,7 +5,7 @@
 **Modalidad:** Warm-Standby **(MSFT validated)**  
 **Región secundaria de contingencia:** Spain Central  
 **Fecha:** 2026-05-12  
-**Versión:** 1.0  
+**Versión:** 1.1  
 **Estado:** Borrador para revisión
 
 ---
@@ -15,7 +15,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | Plan Director de DR — Visión Ejecutiva |
-| Versión | 1.0 |
+| Versión | 1.1 |
 | Fecha | 2026-05-12 |
 | Autor | Copilot |
 | Revisado por | [Completar] |
@@ -27,6 +27,7 @@
 | Versión | Fecha | Descripción | Autor |
 |---|---|---|---|
 | 1.0 | 2026-05-12 | Versión inicial | Copilot |
+| 1.1 | 2026-05-12 | Inclusión de evaluación de requisitos de seguridad, gaps y mitigaciones | Copilot |
 
 ## Índice
 
@@ -45,7 +46,8 @@
 13. Roadmap de implantación  
 14. Requisitos organizativos  
 15. Indicadores de éxito  
-16. Conclusión  
+16. Cumplimiento de requisitos de seguridad  
+17. Conclusión  
 
 ## 1. Resumen Ejecutivo
 
@@ -297,7 +299,62 @@ Se recomienda medir:
 - tiempo medio real de recuperación,
 - cobertura de servicios críticos en DR.
 
-## 16. Conclusión
+## 16. Cumplimiento de requisitos de seguridad
+
+### 16.1 Criterio de evaluación
+
+Los estados utilizados en esta sección son:
+- **Cumple**
+- **Cumple parcialmente**
+- **No evidenciado**
+- **No cumple**
+- **Pendiente de validación**
+
+La evaluación se basa en la arquitectura compartida, en los documentos de DR definidos y en el contraste parcial realizado con capacidades conocidas de Azure. Cuando un requisito no puede demostrarse con la información disponible, se clasifica como **No evidenciado** o **Pendiente de validación**.
+
+### 16.2 Resumen ejecutivo de cumplimiento
+
+| Requisito | Estado | Motivo | Mitigación propuesta |
+|---|---|---|---|
+| mTLS o canales dedicados cifrados en replicación entre CPDs | No evidenciado | La arquitectura no demuestra mTLS extremo a extremo ni cifrado explícito en todos los canales entre CPDs; además se indica que MPLS sin cifrado no sería válido | Documentar cada flujo de replicación, exigir cifrado en tránsito por servicio, usar VPN/ExpressRoute con cifrado complementario cuando aplique y registrar excepción si un canal no soporta mTLS |
+| Identidades de servicio únicas por componente | Cumple parcialmente | Existen Managed Identities en la arquitectura, pero no se evidencia unicidad por cada componente ni prohibición de credenciales compartidas | Definir política de una identidad por componente crítico y eliminar secretos/credenciales compartidas |
+| MFA obligatorio para consolas de clúster y orquestación | No evidenciado | La arquitectura no muestra políticas de acceso condicional ni MFA | Implementar MFA obligatorio con Microsoft Entra ID, Conditional Access y PIM para accesos privilegiados |
+| Matriz de accesos en modo normal, contingencia y desastre | No cumple | No estaba definida explícitamente en la documentación actual | Añadir matriz de accesos formal por rol, entorno y modo operativo |
+| Secretos en bóveda centralizada con rotación | Cumple parcialmente | Se observa uso de Key Vault, pero no se acredita que todos los secretos estén centralizados ni que exista rotación formal | Consolidar todos los secretos en Azure Key Vault y definir política de rotación y custodia |
+| Control de versiones y acceso auditado de runbooks/playbooks | Cumple parcialmente | Los runbooks están versionados en GitHub, pero no se ha documentado aún control de acceso auditado ni gobierno de cambios | Activar branch protection, PR obligatoria, CODEOWNERS y auditoría de cambios |
+| Hardening documentado de imágenes base en nodos HA | No evidenciado | No se aporta baseline ni procedimiento de hardening | Definir hardening CIS o baseline corporativa, imágenes golden y evidencias de escaneo |
+| Pruebas de seguridad durante conmutación | No cumple | Los documentos no incluían todavía pruebas específicas de cifrado, logs y accesos tras failover | Añadir casos de prueba de seguridad en simulacros DR |
+| TLS 1.3 en todos los canales de replicación | Pendiente de validación | No puede garantizarse con la información disponible ni para todos los servicios gestionados | Inventariar por flujo y servicio el protocolo soportado; si no se garantiza TLS 1.3, registrar excepción y control compensatorio |
+| Cifrado en reposo con claves gestionadas por QS | Cumple parcialmente | Hay evidencia de claves y cifrado, pero no cobertura demostrada para todos los servicios y nodos DR | Definir mapa de cobertura de CMK/BYOK y cerrar gaps por componente |
+| Anonimización o datos sintéticos antes de pruebas de carga | No cumple | No existe proceso documentado en el plan actual | Definir procedimiento aprobado de anonimización o datos sintéticos para proyecto 4.2 |
+| Anonimización en origen antes del movimiento de datos | No cumple | No está recogido en la documentación actual | Incorporar control obligatorio en origen antes de mover datos a otros entornos |
+| Logs de auditoría centralizados en plataforma inmutable en todos los nodos | Cumple parcialmente | La arquitectura contempla observabilidad, pero no inmutabilidad demostrada para todos los logs | Centralizar logs en plataforma corporativa con retención, control de acceso e inmutabilidad donde aplique |
+
+### 16.3 Posicionamiento ejecutivo
+
+A nivel ejecutivo, la arquitectura propuesta presenta una **base razonable para cumplir parcialmente** los requisitos de seguridad gracias al uso de capacidades como **Azure Key Vault**, **Managed Identity**, **Private Endpoints** y mecanismos de cifrado y replicación en servicios gestionados de Azure. No obstante, el cumplimiento **no puede considerarse completo** con la evidencia actualmente disponible.
+
+Los principales gaps se concentran en:
+- gobierno de accesos privilegiados y MFA,
+- matriz formal de accesos por modo operativo,
+- definición y evidencia de hardening,
+- pruebas de seguridad en escenarios de conmutación,
+- anonimización de datos para pruebas,
+- demostración formal del cifrado exigido en todos los canales de replicación.
+
+### 16.4 Recomendación ejecutiva
+
+Se recomienda tratar estos requisitos como un **workstream específico de seguridad DR**, con entregables mínimos obligatorios antes de la aceptación final del plan:
+- matriz de accesos normal / contingencia / desastre,
+- política de identidades únicas por componente,
+- política MFA/PIM para operación,
+- procedimiento de rotación de secretos,
+- baseline de hardening,
+- plan de pruebas de seguridad DR,
+- catálogo de cifrado en tránsito y en reposo por componente,
+- procedimiento formal de anonimización en origen.
+
+## 17. Conclusión
 
 La adopción de un modelo **warm-standby en Spain Central** constituye una estrategia adecuada para incrementar la resiliencia de la plataforma Azure analizada.
 
@@ -308,4 +365,5 @@ Se recomienda avanzar hacia la implantación técnica priorizando:
 - AKS,
 - Databricks,
 - automatización,
-- pruebas operativas.
+- pruebas operativas,
+- y el cierre de los gaps de seguridad identificados.
