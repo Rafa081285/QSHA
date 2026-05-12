@@ -5,7 +5,7 @@
 **Modalidad:** Warm-Standby **(MSFT validated)**  
 **Región secundaria de contingencia:** Spain Central  
 **Fecha:** 2026-05-12  
-**Versión:** 1.0  
+**Versión:** 1.1  
 **Estado:** Borrador para revisión
 
 ---
@@ -15,7 +15,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | Plan Técnico Detallado de DR |
-| Versión | 1.0 |
+| Versión | 1.1 |
 | Fecha | 2026-05-12 |
 | Autor | Copilot |
 | Revisado por | [Completar] |
@@ -27,6 +27,7 @@
 | Versión | Fecha | Descripción | Autor |
 |---|---|---|---|
 | 1.0 | 2026-05-12 | Versión inicial | Copilot |
+| 1.1 | 2026-05-12 | Inclusión de controles, gaps y mitigaciones de seguridad | Copilot |
 
 ## Índice
 
@@ -41,7 +42,8 @@
 9. Actividades de implantación  
 10. Criterios de aceptación técnica  
 11. Dependencias críticas  
-12. Recomendaciones finales  
+12. Controles y gaps de seguridad  
+13. Recomendaciones finales  
 
 ## 1. Objeto del Documento
 
@@ -387,7 +389,107 @@ El entorno se considerará operativo cuando:
 - accesos break-glass,
 - dependencias externas a Azure.
 
-## 12. Recomendaciones Finales
+## 12. Controles y gaps de seguridad
+
+### 12.1 Criterio técnico de evaluación
+
+Los estados utilizados son:
+- **Cumple**
+- **Cumple parcialmente**
+- **No evidenciado**
+- **No cumple**
+- **Pendiente de validación**
+
+La valoración se realiza con base en la arquitectura aportada, la documentación generada y la evidencia disponible en esta fase. Un requisito no demostrado técnicamente no se considera cumplido.
+
+### 12.2 Matriz detallada de cumplimiento técnico
+
+| Requisito | Estado | Evidencia actual | Gap / riesgo técnico | Mitigación técnica propuesta | Prioridad |
+|---|---|---|---|---|---|
+| mTLS o comunicaciones punto a punto dedicadas cifradas en todos los canales de replicación entre CPDs | No evidenciado | No se observa en la arquitectura evidencia explícita de mTLS extremo a extremo; Virtual WAN y conectividad no demuestran por sí solas cumplimiento criptográfico de todos los flujos | Riesgo de incumplimiento del requisito de cifrado extremo a extremo; MPLS sin cifrado no sería aceptable | Inventariar todos los flujos de replicación; exigir TLS/mTLS por canal cuando el servicio lo soporte; documentar túneles cifrados o controles compensatorios por flujo | Alta |
+| Prohibición de MPLS sin cifrado | No evidenciado | No se documenta el medio real entre CPDs ni su cifrado | Riesgo de uso de red dedicada sin cifrado suficiente | Declarar explícitamente en diseño que MPLS sin cifrado queda excluido; añadir requisito de cifrado en tránsito en todos los enlaces intersite | Alta |
+| Identidades de servicio únicas por componente | Cumple parcialmente | Presencia de Managed Identity en arquitectura y documentos | No se demuestra unicidad por workload, clúster, job o servicio; posible reutilización de credenciales | Implantar una identidad gestionada por componente crítico y eliminar credenciales compartidas | Alta |
+| MFA para consolas de gestión de clústeres y orquestación | No evidenciado | No hay evidencia documental de Conditional Access, MFA ni PIM | Riesgo de acceso privilegiado insuficientemente protegido | Configurar MFA obligatorio con Microsoft Entra ID, Conditional Access, PIM y acceso just-in-time | Alta |
+| Matriz de accesos en modo normal, contingencia y desastre | No cumple | No existía una matriz formal en la versión previa del plan | Riesgo operativo y de segregación de funciones durante DR | Crear matriz RACI/accesos por modo operativo y anexarla al plan técnico y runbook | Alta |
+| Secretos centralizados en bóveda de claves con generación segura y rotación | Cumple parcialmente | Uso de Key Vault en arquitectura **(MSFT validated)** | No se demuestra cobertura total ni política de rotación formal | Consolidar secretos en Azure Key Vault, definir ownership, rotación, expiración y auditoría | Alta |
+| Control de versiones y acceso auditado para runbooks/playbooks | Cumple parcialmente | Los documentos están en GitHub y versionados | Falta evidencia de branch protection, revisión obligatoria y auditoría formal | Activar protección de ramas, PR obligatoria, CODEOWNERS y trazabilidad de cambios | Media |
+| Hardening documentado de imágenes base en nodos HA | No evidenciado | No se aporta baseline de hardening ni referencia a imágenes golden | Riesgo de nodos DR con baseline inconsistente respecto a producción | Definir baseline CIS/corporativa, pipeline de hardening, escaneo y evidencias por imagen | Alta |
+| Escenarios de pruebas para cifrado, logs y controles de acceso ante conmutación | No cumple | El runbook no detalla aún pruebas específicas de seguridad en failover | Riesgo de perder controles en el paso a DR sin detectarlo | Añadir casos de prueba DR de seguridad: cifrado en tránsito, accesos, auditoría y centralización de logs | Alta |
+| TLS 1.3 en todos los canales de replicación de información | Pendiente de validación | No hay evidencia técnica exhaustiva por servicio y flujo | Riesgo de no cumplir el requisito si algún servicio o integración opera con otra versión o abstracción gestionada | Elaborar catálogo por flujo: origen, destino, protocolo, versión TLS soportada, evidencia y excepción si aplica | Alta |
+| Cifrado en reposo con claves gestionadas por QS en todos los nodos y entornos DR | Cumple parcialmente | Se observan Key Vault, Disk Encryption Key y referencias de cifrado | No se demuestra que todos los servicios soporten o usen claves gestionadas por QS en DR | Crear matriz de cobertura de CMK/BYOK por servicio; cerrar gaps en SQL, discos, storage y servicios analíticos según soporte real | Alta |
+| Proceso aprobado de anonimización o datos sintéticos antes de pruebas de carga | No cumple | No existe en la documentación actual | Riesgo de uso indebido de datos reales en pruebas | Definir procedimiento formal de anonimización/sintetización y aprobación previa a pruebas del proyecto 4.2 | Alta |
+| Anonimización en origen antes del traslado de datos | No cumple | No documentado | Riesgo de mover datos sensibles sin protección previa | Implementar en origen pipelines o procesos de masking antes de exportar o replicar datos a entornos no productivos | Alta |
+| Logs de auditoría centralizados en plataforma inmutable y operativos en todos los nodos | Cumple parcialmente | La arquitectura contempla observabilidad | No se acredita inmutabilidad ni cobertura homogénea en todos los nodos/regiones | Definir plataforma central de logs, retención, inmutabilidad y validación también en entorno DR | Alta |
+
+### 12.3 Controles técnicos requeridos por dominio
+
+#### 12.3.1 Identidades y accesos
+Se deberán implantar como mínimo los siguientes controles:
+- una identidad gestionada por componente crítico,
+- prohibición expresa de cuentas compartidas para servicios,
+- MFA obligatorio para operadores y administradores,
+- PIM o elevación temporal para privilegios administrativos,
+- matriz de accesos diferenciada para operación normal, contingencia y desastre,
+- revisión periódica de permisos.
+
+#### 12.3.2 Gestión de secretos
+Se deberán implantar como mínimo los siguientes controles:
+- bóveda centralizada de secretos,
+- rotación definida por tipo de secreto,
+- expiración y alertado,
+- uso preferente de Managed Identity frente a secretos estáticos,
+- evidencias de acceso auditado.
+
+#### 12.3.3 Protección de datos
+Se deberán implantar como mínimo los siguientes controles:
+- inventario de cifrado en tránsito por flujo,
+- inventario de cifrado en reposo por servicio,
+- CMK/BYOK donde aplique y exista soporte,
+- procedimiento de anonimización en origen,
+- control de uso de datos sintéticos para pruebas.
+
+#### 12.3.4 Seguridad en el ciclo de vida
+Se deberán implantar como mínimo los siguientes controles:
+- versionado de runbooks,
+- revisión y aprobación de cambios,
+- hardening documentado de imágenes base,
+- escaneo de vulnerabilidades,
+- casos de prueba específicos de seguridad en simulacros DR.
+
+#### 12.3.5 Monitorización y auditoría
+Se deberán implantar como mínimo los siguientes controles:
+- centralización de logs,
+- retención definida,
+- control de acceso a logs,
+- inmutabilidad donde el requisito corporativo lo exija,
+- validación de continuidad de la auditoría tras failover.
+
+### 12.4 Criterios de aceptación específicos de seguridad
+
+El plan técnico no deberá considerarse completamente aceptado hasta que se disponga de:
+- matriz de accesos por modo operativo,
+- inventario de identidades por componente,
+- evidencia de MFA/PIM para operación,
+- política de secretos y rotación,
+- baseline de hardening aprobada,
+- catálogo de cifrado en tránsito y en reposo,
+- procedimiento de anonimización en origen,
+- casos de prueba DR de seguridad,
+- diseño de centralización e inmutabilidad de logs.
+
+### 12.5 Acciones priorizadas
+
+1. Definir matriz de accesos normal / contingencia / desastre.  
+2. Confirmar MFA, Conditional Access y PIM para operación privilegiada.  
+3. Inventariar identidades de servicio y eliminar credenciales compartidas.  
+4. Inventariar flujos de replicación y validar cifrado real por canal.  
+5. Definir política de Key Vault y rotación de secretos.  
+6. Formalizar hardening de imágenes base y nodos.  
+7. Añadir pruebas de seguridad al runbook y a los simulacros DR.  
+8. Definir anonimización en origen y uso de datos sintéticos para pruebas.  
+9. Diseñar centralización e inmutabilidad de logs en ambos nodos/regiones.  
+
+## 13. Recomendaciones Finales
 
 Se recomienda priorizar:
 1. Azure SQL y Storage  
@@ -397,10 +499,12 @@ Se recomienda priorizar:
 5. Databricks DR  
 6. mecanismo de publicación  
 7. automatización y simulacros  
+8. cierre de gaps de seguridad identificados  
 
 La eficacia del DR dependerá especialmente de:
 - la automatización real,
 - la consistencia del dato,
 - la disponibilidad de secretos,
 - la validez de la conectividad privada,
-- la disciplina en las pruebas.
+- la disciplina en las pruebas,
+- y la implantación efectiva de los controles de seguridad requeridos.
