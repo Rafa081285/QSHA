@@ -5,7 +5,7 @@
 **Modalidad:** Warm-Standby **(MSFT validated)**  
 **Región secundaria de contingencia:** Spain Central  
 **Fecha:** 2026-05-12  
-**Versión:** 1.1  
+**Versión:** 1.2  
 **Estado:** Borrador para revisión
 
 ---
@@ -15,7 +15,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | Plan Director de DR — Visión Ejecutiva |
-| Versión | 1.1 |
+| Versión | 1.2 |
 | Fecha | 2026-05-12 |
 | Autor | Copilot |
 | Revisado por | [Completar] |
@@ -28,6 +28,7 @@
 |---|---|---|---|
 | 1.0 | 2026-05-12 | Versión inicial | Copilot |
 | 1.1 | 2026-05-12 | Inclusión de evaluación de requisitos de seguridad, gaps y mitigaciones | Copilot |
+| 1.2 | 2026-05-12 | Ampliación del alcance por categoría y servicio | Copilot |
 
 ## Índice
 
@@ -93,36 +94,115 @@ La criticidad de los componentes y la dependencia de servicios regionales hacen 
 
 ## 4. Alcance
 
-El presente plan cubre, a nivel ejecutivo, los siguientes dominios:
+El presente plan cubre, a nivel ejecutivo, los dominios y servicios identificados en la arquitectura objetivo. El alcance no se limita a una clasificación funcional, sino que incorpora el tratamiento previsto de Disaster Recovery por servicio dentro de cada categoría.
 
 ### 4.1 Conectividad y red
-- Azure Virtual WAN
-- hub/spoke networking
-- subredes, rutas y segmentación
-- firewalling
-- DNS privado **(MSFT validated)**
-- private endpoints **(MSFT validated)**
+
+#### Azure Virtual WAN
+- **Rol en la arquitectura:** backbone de conectividad entre redes, hubs y servicios conectados.
+- **Objetivo en DR:** mantener la conectividad troncal y el enrutamiento necesarios para operar desde Spain Central.
+- **Tratamiento DR:** réplica funcional de la conectividad y validación de rutas, propagación y reachability.
+- **Estado esperado en DR:** preaprovisionado y validado.
+- **Riesgo principal:** rutas incompletas o dependencias no reflejadas en DR.
+
+#### Topología hub/spoke
+- **Rol en la arquitectura:** segmentación de redes y separación de cargas.
+- **Objetivo en DR:** reproducir el aislamiento y la conectividad de los entornos críticos.
+- **Tratamiento DR:** despliegue equivalente de VNets, subredes, NSGs y UDRs.
+- **Estado esperado en DR:** desplegado y alineado con el diseño primario.
+- **Riesgo principal:** diferencias de direccionamiento o reglas no replicadas.
+
+#### Firewalling y publicación perimetral
+- **Rol en la arquitectura:** control de tráfico y exposición de servicios.
+- **Objetivo en DR:** mantener la publicación segura y controlada de los servicios críticos.
+- **Tratamiento DR:** despliegue de componente equivalente de publicación y seguridad, listo para conmutación.
+- **Estado esperado en DR:** activo o preparado para activación.
+- **Riesgo principal:** reglas, certificados o backends no sincronizados.
+
+#### DNS privado y Private Endpoints **(MSFT validated)**
+- **Rol en la arquitectura:** resolución interna y acceso privado a servicios PaaS.
+- **Objetivo en DR:** asegurar conectividad privada funcional desde cargas ejecutadas en Spain Central.
+- **Tratamiento DR:** duplicación de zonas DNS privadas, enlaces y private endpoints necesarios.
+- **Estado esperado en DR:** operativo antes del failover.
+- **Riesgo principal:** errores de resolución o endpoints no enlazados correctamente.
 
 ### 4.2 Plataforma de aplicación
-- AKS
-- publicación e ingreso
-- dependencias con servicios PaaS
+
+#### AKS
+- **Rol en la arquitectura:** plataforma principal de ejecución de workloads contenerizados.
+- **Objetivo en DR:** permitir la ejecución de servicios críticos en la región secundaria.
+- **Tratamiento DR:** clúster secundario desplegado con capacidad mínima y escalado bajo demanda.
+- **Estado esperado en DR:** preaprovisionado, integrado con red, secretos, imágenes y observabilidad.
+- **Riesgo principal:** divergencia de configuración, secretos no disponibles o persistencia no protegida.
+
+#### Ingress / publicación de aplicaciones
+- **Rol en la arquitectura:** exposición de servicios ejecutados sobre AKS u otras plataformas.
+- **Objetivo en DR:** conmutar la entrada del servicio al entorno secundario sin rediseño en crisis.
+- **Tratamiento DR:** configuración equivalente de publicación, certificados y backends.
+- **Estado esperado en DR:** preparado para activación.
+- **Riesgo principal:** certificados, reglas o mappings no alineados.
 
 ### 4.3 Datos
-- Azure SQL **(MSFT validated)**
-- almacenamiento asociado
-- backups y restauración **(MSFT validated)**
 
-### 4.4 Analítica
-- Azure Databricks
-- accesos privados a datos
-- procesamiento crítico
+#### Azure SQL **(MSFT validated)**
+- **Rol en la arquitectura:** repositorio relacional crítico para la operación.
+- **Objetivo en DR:** garantizar recuperabilidad con RTO/RPO acordados.
+- **Tratamiento DR:** geo-réplica o auto-failover group hacia Spain Central.
+- **Estado esperado en DR:** replicando y listo para promoción.
+- **Riesgo principal:** latencia de replicación, accesos no validados o failover no probado.
+
+#### Storage / Data Lake
+- **Rol en la arquitectura:** almacenamiento de datos operacionales, ficheros y/o datasets analíticos.
+- **Objetivo en DR:** mantener disponibilidad de datos requeridos por aplicaciones y analítica.
+- **Tratamiento DR:** redundancia geográfica o cuenta secundaria con acceso desde DR.
+- **Estado esperado en DR:** replicando o preparado para promoción.
+- **Riesgo principal:** dependencia de endpoints, permisos o promoción no transparente.
+
+#### Backup y restauración **(MSFT validated)**
+- **Rol en la arquitectura:** mecanismo de recuperación adicional ante corrupción, borrado o fallo lógico.
+- **Objetivo en DR:** permitir recuperación alternativa cuando la réplica no sea suficiente o no sea viable.
+- **Tratamiento DR:** políticas de backup, retención y restore tests periódicos.
+- **Estado esperado en DR:** operativo y validado.
+- **Riesgo principal:** backups no restaurados periódicamente o cobertura incompleta.
+
+### 4.4 Analítica y procesamiento
+
+#### Azure Databricks
+- **Rol en la arquitectura:** procesamiento analítico, pipelines de datos y ejecución de cargas analíticas.
+- **Objetivo en DR:** reanudar los procesos analíticos críticos tras el failover.
+- **Tratamiento DR:** workspace secundario desplegado con conectividad, secretos y objetos críticos preparados.
+- **Estado esperado en DR:** preaprovisionado, con activación controlada.
+- **Riesgo principal:** objetos no versionados, dependencias de catálogo o secretos no sincronizados.
+
+#### Jobs, notebooks y políticas analíticas
+- **Rol en la arquitectura:** definición de procesos de negocio y explotación de datos.
+- **Objetivo en DR:** reactivar en orden de prioridad los procesos analíticos esenciales.
+- **Tratamiento DR:** versionado y replicación lógica de jobs, notebooks, configuraciones y dependencias.
+- **Estado esperado en DR:** preparado para ejecución.
+- **Riesgo principal:** dependencia manual o configuración divergente.
 
 ### 4.5 Seguridad y operación
-- Key Vault **(MSFT validated)**
-- Managed Identity **(MSFT validated)**
-- claves de cifrado **(MSFT validated)**
-- monitorización y alertado
+
+#### Azure Key Vault **(MSFT validated)**
+- **Rol en la arquitectura:** custodia de secretos, certificados y claves.
+- **Objetivo en DR:** asegurar que los componentes en DR acceden a sus secretos y materiales criptográficos.
+- **Tratamiento DR:** Key Vault secundario o estrategia equivalente con replicación/control de secretos.
+- **Estado esperado en DR:** operativo antes de la activación.
+- **Riesgo principal:** secretos no sincronizados o referencias al vault primario.
+
+#### Managed Identities **(MSFT validated)**
+- **Rol en la arquitectura:** autenticación de servicios sin credenciales embebidas.
+- **Objetivo en DR:** mantener acceso seguro entre componentes.
+- **Tratamiento DR:** asignación de identidades equivalentes y permisos explícitos en entorno secundario.
+- **Estado esperado en DR:** preparado y validado.
+- **Riesgo principal:** permisos incompletos o reutilización no controlada.
+
+#### Observabilidad y monitorización
+- **Rol en la arquitectura:** supervisión técnica, alertado y trazabilidad operativa.
+- **Objetivo en DR:** mantener visibilidad completa del entorno secundario durante contingencia.
+- **Tratamiento DR:** continuidad de métricas, logs y alertas en DR.
+- **Estado esperado en DR:** activo y accesible.
+- **Riesgo principal:** pérdida de trazabilidad o cobertura incompleta de logs en DR.
 
 ## 5. Estrategia de Continuidad Propuesta
 
