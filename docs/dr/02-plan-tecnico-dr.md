@@ -5,7 +5,7 @@
 **Modalidad:** Warm-Standby **(MSFT validated)**  
 **Región secundaria de contingencia:** Spain Central  
 **Fecha:** 2026-05-12  
-**Versión:** 1.1  
+**Versión:** 1.2  
 **Estado:** Borrador para revisión
 
 ---
@@ -15,7 +15,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | Plan Técnico Detallado de DR |
-| Versión | 1.1 |
+| Versión | 1.2 |
 | Fecha | 2026-05-12 |
 | Autor | Copilot |
 | Revisado por | [Completar] |
@@ -28,22 +28,24 @@
 |---|---|---|---|
 | 1.0 | 2026-05-12 | Versión inicial | Copilot |
 | 1.1 | 2026-05-12 | Inclusión de controles, gaps y mitigaciones de seguridad | Copilot |
+| 1.2 | 2026-05-12 | Ampliación del alcance técnico por categoría y servicio | Copilot |
 
 ## Índice
 
 1. Objeto del documento  
 2. Referencia arquitectónica  
 3. Objetivos técnicos  
-4. Principios técnicos de diseño  
-5. Modelo de recuperación  
-6. Arquitectura técnica objetivo  
-7. Matriz técnica de recuperación  
-8. Secuencia técnica de recuperación  
-9. Actividades de implantación  
-10. Criterios de aceptación técnica  
-11. Dependencias críticas  
-12. Controles y gaps de seguridad  
-13. Recomendaciones finales  
+4. Alcance técnico por categoría y servicio  
+5. Principios técnicos de diseño  
+6. Modelo de recuperación  
+7. Arquitectura técnica objetivo  
+8. Matriz técnica de recuperación  
+9. Secuencia técnica de recuperación  
+10. Actividades de implantación  
+11. Criterios de aceptación técnica  
+12. Dependencias críticas  
+13. Controles y gaps de seguridad  
+14. Recomendaciones finales  
 
 ## 1. Objeto del Documento
 
@@ -87,18 +89,58 @@ La propuesta se basa en la arquitectura facilitada, que incluye:
 5. Facilitar pruebas periódicas.
 6. Cumplir RTO/RPO acordados.
 
-## 4. Principios Técnicos de Diseño
+## 4. Alcance técnico por categoría y servicio
 
-### 4.1 Infrastructure as Code
+El alcance técnico del presente plan incluye los servicios identificados en la arquitectura y define para cada uno su tratamiento esperado en el escenario de DR en Spain Central.
+
+| Categoría | Servicio | Rol técnico | Estrategia DR | Estado esperado en DR | Validaciones clave | Riesgo principal |
+|---|---|---|---|---|---|---|
+| Red | Azure Virtual WAN | Conectividad troncal | réplica funcional | desplegado | rutas, reachability, propagación | rutas incompletas |
+| Red | Hub/Spoke VNets | segmentación | despliegue equivalente | desplegado | subredes, NSG, UDR | diferencias de configuración |
+| Red | Firewall / publicación | control perimetral | componente equivalente | activo/preparado | reglas, backend, certificados | desalineación de reglas |
+| Red | DNS privado | resolución interna | duplicación de zonas y links | operativo | resolución desde DR | errores de resolución |
+| Red | Private Endpoints | acceso privado PaaS | endpoints específicos de DR | operativo | conectividad a SQL/KV/Storage | endpoints no funcionales |
+| Aplicación | AKS | ejecución de workloads | clúster secundario | mínimo/escalable | pods, ingress, secretos, conectividad | divergencia de clúster |
+| Aplicación | Ingress / publicación | exposición de apps | backend preparado para conmutación | preparado | TLS, routing, health | publicación no alineada |
+| Datos | Azure SQL | dato relacional crítico | geo-réplica / failover group | replicando | failover, conectividad, integridad | réplica no validada |
+| Datos | Storage / Data Lake | almacenamiento crítico | GRS/secundario/promoción | replicando/preparado | acceso desde AKS/DBX | permisos/endpoints |
+| Datos | Backup | recuperación alternativa | restore probado | operativo | PITR/LTR/restore | backup no validado |
+| Analítica | Databricks Workspace | analítica y pipelines | workspace DR | preparado | acceso, secretos, networking | objetos no sincronizados |
+| Analítica | Jobs / notebooks | lógica analítica | versionado y redeploy | preparado | ejecución priorizada | dependencias manuales |
+| Seguridad | Key Vault | secretos y claves | vault DR / estrategia equivalente | operativo | acceso, secretos, certificados | secretos desalineados |
+| Seguridad | Managed Identity | auth entre servicios | asignación equivalente | preparado | permisos por componente | permisos insuficientes |
+| Operación | Monitorización | métricas, logs, alertas | continuidad operativa | activo | logs, alertas, dashboards | pérdida de trazabilidad |
+
+### 4.1 Consideraciones de alcance
+El alcance técnico incluye tanto componentes permanentemente desplegados en la región secundaria como componentes preparados para activación o escalado durante contingencia.
+
+Se consideran dentro del alcance:
+- la infraestructura base necesaria para conmutación,
+- la protección y recuperabilidad del dato,
+- la ejecución de cargas críticas,
+- la continuidad de la publicación,
+- la seguridad operativa,
+- la trazabilidad y la observabilidad del entorno DR.
+
+Quedan sujetos a validación específica en fases posteriores:
+- dependencias de terceros,
+- integraciones no reflejadas completamente en la arquitectura,
+- restricciones regionales de capacidad,
+- compatibilidades de cifrado o publicación en servicios concretos,
+- y cualquier componente manual no versionado.
+
+## 5. Principios Técnicos de Diseño
+
+### 5.1 Infrastructure as Code
 Toda infraestructura replicable deberá definirse con:
 - Terraform,
 - Bicep,
 - o herramientas equivalentes controladas.
 
-### 4.2 Automatización
+### 5.2 Automatización
 Las capas de aplicación y analítica deberán poder desplegarse de forma repetible.
 
-### 4.3 Recuperación por dependencias
+### 5.3 Recuperación por dependencias
 La recuperación seguirá este orden:
 1. red,
 2. seguridad,
@@ -107,28 +149,28 @@ La recuperación seguirá este orden:
 5. analítica,
 6. publicación.
 
-### 4.4 Configuración versionada
+### 5.4 Configuración versionada
 Todo componente crítico deberá estar:
 - versionado,
 - trazado,
 - revisado.
 
-### 4.5 Validación recurrente
+### 5.5 Validación recurrente
 Ningún componente DR se considerará operativo sin pruebas.
 
-## 5. Modelo de Recuperación
+## 6. Modelo de Recuperación
 
-### 5.1 Región primaria
+### 6.1 Región primaria
 Presta servicio habitual.
 
-### 5.2 Región DR
+### 6.2 Región DR
 **Spain Central** mantendrá:
 - infraestructura base preaprovisionada,
 - servicios de datos replicados,
 - capacidad mínima para componentes críticos,
 - mecanismos de publicación listos para activación.
 
-### 5.3 Activación
+### 6.3 Activación
 La región DR asumirá operación mediante:
 - failover de datos,
 - activación o escalado de AKS,
@@ -136,9 +178,9 @@ La región DR asumirá operación mediante:
 - validación de seguridad y secretos,
 - cambio de routing/publicación.
 
-## 6. Arquitectura Técnica Objetivo
+## 7. Arquitectura Técnica Objetivo
 
-## 6.1 Red y conectividad
+## 7.1 Red y conectividad
 
 ### Componentes requeridos en DR
 - Resource Groups equivalentes
@@ -166,7 +208,7 @@ La región DR asumirá operación mediante:
 - DNS privado incompleto,
 - dependencia de IPs fijas.
 
-## 6.2 Seguridad, secretos e identidades
+## 7.2 Seguridad, secretos e identidades
 
 ### Componentes requeridos
 - Key Vault secundario,
@@ -188,9 +230,9 @@ La región DR asumirá operación mediante:
 - claves no accesibles,
 - dependencias manuales.
 
-## 6.3 Datos
+## 7.3 Datos
 
-### 6.3.1 Azure SQL
+### 7.3.1 Azure SQL
 **Estrategia recomendada:**
 - geo-réplica o auto-failover group hacia Spain Central. **(MSFT validated)**
 
@@ -203,7 +245,7 @@ La región DR asumirá operación mediante:
 
 **Objetivo:** permitir promoción a primario en una ventana compatible con RTO.
 
-### 6.3.2 Storage / Lake
+### 7.3.2 Storage / Lake
 **Estrategia recomendada:**
 - redundancia geográfica o cuenta secundaria,
 - accesibilidad desde AKS y Databricks DR,
@@ -214,12 +256,12 @@ La región DR asumirá operación mediante:
 - endpoint privado no operativo,
 - permisos inconsistentes.
 
-### 6.3.3 Backup y restauración
+### 7.3.3 Backup y restauración
 - políticas de backup vigentes,
 - pruebas de restauración periódicas,
 - evidencias conservadas.
 
-## 6.4 Plataforma de Aplicación — AKS
+## 7.4 Plataforma de Aplicación — AKS
 
 ### Estrategia
 Desplegar un **AKS secundario en Spain Central** con:
@@ -246,7 +288,7 @@ Desplegar un **AKS secundario en Spain Central** con:
 - persistencia regional no protegida,
 - diferencias manuales entre clústeres.
 
-## 6.5 Analítica — Azure Databricks
+## 7.5 Analítica — Azure Databricks
 
 ### Estrategia
 Desplegar un workspace secundario en Spain Central con:
@@ -271,7 +313,7 @@ Desplegar un workspace secundario en Spain Central con:
 - dependencias de red privada,
 - inconsistencia entre entornos.
 
-## 6.6 Publicación y exposición
+## 7.6 Publicación y exposición
 
 ### Alternativas
 - Azure Front Door
@@ -288,7 +330,7 @@ Si la aplicación es pública y requiere conmutación simplificada, valorar **Az
 - certificados válidos,
 - validación desde Internet y red corporativa.
 
-## 7. Matriz Técnica de Recuperación
+## 8. Matriz Técnica de Recuperación
 
 | Dominio | Componente | Estrategia DR | Estado esperado en DR | Acción de failover |
 |---|---|---|---|---|
@@ -304,7 +346,7 @@ Si la aplicación es pública y requiere conmutación simplificada, valorar **Az
 | Publicación | Front Door / DNS / AppGW | conmutación preparada | mínimo/activo | redirigir tráfico |
 | Operación | Monitorización | operativa | activa | supervisión reforzada |
 
-## 8. Secuencia Técnica de Recuperación
+## 9. Secuencia Técnica de Recuperación
 
 1. Declaración del incidente  
 2. Freeze de cambios  
@@ -318,54 +360,54 @@ Si la aplicación es pública y requiere conmutación simplificada, valorar **Az
 10. Smoke tests  
 11. Apertura controlada del servicio  
 
-## 9. Actividades de Implantación
+## 10. Actividades de Implantación
 
-### 9.1 Assessment
+### 10.1 Assessment
 - inventario,
 - dependencias,
 - criticidad,
 - RTO/RPO,
 - gaps actuales.
 
-### 9.2 Red
+### 10.2 Red
 - despliegue red DR,
 - integración con Virtual WAN,
 - DNS privado,
 - private endpoints,
 - validación de conectividad.
 
-### 9.3 Seguridad
+### 10.3 Seguridad
 - Key Vault DR,
 - permisos,
 - identidades,
 - claves,
 - diagnósticos.
 
-### 9.4 Datos
+### 10.4 Datos
 - SQL réplica **(MSFT validated)**,
 - backup/restore **(MSFT validated)**,
 - storage redundante,
 - pruebas de acceso.
 
-### 9.5 AKS
+### 10.5 AKS
 - clúster DR,
 - integración con ACR/KV/Monitor,
 - despliegues,
 - pruebas funcionales.
 
-### 9.6 Databricks
+### 10.6 Databricks
 - workspace DR,
 - networking,
 - secretos,
 - jobs/notebooks,
 - pruebas de datos.
 
-### 9.7 Publicación
+### 10.7 Publicación
 - diseño de conmutación,
 - pruebas DNS/routing,
 - simulacro integral.
 
-## 10. Criterios de Aceptación Técnica
+## 11. Criterios de Aceptación Técnica
 
 El entorno se considerará operativo cuando:
 - la red DR esté desplegada y validada,
@@ -378,7 +420,7 @@ El entorno se considerará operativo cuando:
 - el simulacro técnico se haya completado,
 - RTO/RPO hayan sido medidos y aceptados.
 
-## 11. Dependencias Críticas
+## 12. Dependencias Críticas
 
 - cuotas regionales en Spain Central,
 - dependencias con terceros,
@@ -389,9 +431,9 @@ El entorno se considerará operativo cuando:
 - accesos break-glass,
 - dependencias externas a Azure.
 
-## 12. Controles y gaps de seguridad
+## 13. Controles y gaps de seguridad
 
-### 12.1 Criterio técnico de evaluación
+### 13.1 Criterio técnico de evaluación
 
 Los estados utilizados son:
 - **Cumple**
@@ -402,7 +444,7 @@ Los estados utilizados son:
 
 La valoración se realiza con base en la arquitectura aportada, la documentación generada y la evidencia disponible en esta fase. Un requisito no demostrado técnicamente no se considera cumplido.
 
-### 12.2 Matriz detallada de cumplimiento técnico
+### 13.2 Matriz detallada de cumplimiento técnico
 
 | Requisito | Estado | Evidencia actual | Gap / riesgo técnico | Mitigación técnica propuesta | Prioridad |
 |---|---|---|---|---|---|
@@ -421,9 +463,9 @@ La valoración se realiza con base en la arquitectura aportada, la documentació
 | Anonimización en origen antes del traslado de datos | No cumple | No documentado | Riesgo de mover datos sensibles sin protección previa | Implementar en origen pipelines o procesos de masking antes de exportar o replicar datos a entornos no productivos | Alta |
 | Logs de auditoría centralizados en plataforma inmutable y operativos en todos los nodos | Cumple parcialmente | La arquitectura contempla observabilidad | No se acredita inmutabilidad ni cobertura homogénea en todos los nodos/regiones | Definir plataforma central de logs, retención, inmutabilidad y validación también en entorno DR | Alta |
 
-### 12.3 Controles técnicos requeridos por dominio
+### 13.3 Controles técnicos requeridos por dominio
 
-#### 12.3.1 Identidades y accesos
+#### 13.3.1 Identidades y accesos
 Se deberán implantar como mínimo los siguientes controles:
 - una identidad gestionada por componente crítico,
 - prohibición expresa de cuentas compartidas para servicios,
@@ -432,7 +474,7 @@ Se deberán implantar como mínimo los siguientes controles:
 - matriz de accesos diferenciada para operación normal, contingencia y desastre,
 - revisión periódica de permisos.
 
-#### 12.3.2 Gestión de secretos
+#### 13.3.2 Gestión de secretos
 Se deberán implantar como mínimo los siguientes controles:
 - bóveda centralizada de secretos,
 - rotación definida por tipo de secreto,
@@ -440,7 +482,7 @@ Se deberán implantar como mínimo los siguientes controles:
 - uso preferente de Managed Identity frente a secretos estáticos,
 - evidencias de acceso auditado.
 
-#### 12.3.3 Protección de datos
+#### 13.3.3 Protección de datos
 Se deberán implantar como mínimo los siguientes controles:
 - inventario de cifrado en tránsito por flujo,
 - inventario de cifrado en reposo por servicio,
@@ -448,7 +490,7 @@ Se deberán implantar como mínimo los siguientes controles:
 - procedimiento de anonimización en origen,
 - control de uso de datos sintéticos para pruebas.
 
-#### 12.3.4 Seguridad en el ciclo de vida
+#### 13.3.4 Seguridad en el ciclo de vida
 Se deberán implantar como mínimo los siguientes controles:
 - versionado de runbooks,
 - revisión y aprobación de cambios,
@@ -456,7 +498,7 @@ Se deberán implantar como mínimo los siguientes controles:
 - escaneo de vulnerabilidades,
 - casos de prueba específicos de seguridad en simulacros DR.
 
-#### 12.3.5 Monitorización y auditoría
+#### 13.3.5 Monitorización y auditoría
 Se deberán implantar como mínimo los siguientes controles:
 - centralización de logs,
 - retención definida,
@@ -464,7 +506,7 @@ Se deberán implantar como mínimo los siguientes controles:
 - inmutabilidad donde el requisito corporativo lo exija,
 - validación de continuidad de la auditoría tras failover.
 
-### 12.4 Criterios de aceptación específicos de seguridad
+### 13.4 Criterios de aceptación específicos de seguridad
 
 El plan técnico no deberá considerarse completamente aceptado hasta que se disponga de:
 - matriz de accesos por modo operativo,
@@ -477,7 +519,7 @@ El plan técnico no deberá considerarse completamente aceptado hasta que se dis
 - casos de prueba DR de seguridad,
 - diseño de centralización e inmutabilidad de logs.
 
-### 12.5 Acciones priorizadas
+### 13.5 Acciones priorizadas
 
 1. Definir matriz de accesos normal / contingencia / desastre.  
 2. Confirmar MFA, Conditional Access y PIM para operación privilegiada.  
@@ -489,7 +531,7 @@ El plan técnico no deberá considerarse completamente aceptado hasta que se dis
 8. Definir anonimización en origen y uso de datos sintéticos para pruebas.  
 9. Diseñar centralización e inmutabilidad de logs en ambos nodos/regiones.  
 
-## 13. Recomendaciones Finales
+## 14. Recomendaciones Finales
 
 Se recomienda priorizar:
 1. Azure SQL y Storage  

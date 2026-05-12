@@ -12,5 +12,6 @@
 > 1. [Plan Director de DR — Visión Ejecutiva](./01-plan-director-dr.md)
 > 2. [Plan Técnico Detallado de DR](./02-plan-tecnico-dr.md)
 > 3. [Runbook Operativo de Failover y Failback](./03-runbook-failover-failback.md)
+> 4. [Anexos de Seguridad y Operación para DR](./04-anexos-seguridad-y-operacion.md)
 >
 > **Siguiente paso recomendado:** completar una revisión formal contra documentación oficial de Microsoft Learn para todos los apartados no etiquetados como **(MSFT validated)**.
