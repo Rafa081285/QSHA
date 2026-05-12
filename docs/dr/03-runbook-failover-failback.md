@@ -5,7 +5,7 @@
 **Modalidad:** Warm-Standby **(MSFT validated)**  
 **Región secundaria de contingencia:** Spain Central  
 **Fecha:** 2026-05-12  
-**Versión:** 1.0  
+**Versión:** 1.1  
 **Estado:** Borrador para revisión
 
 ---
@@ -15,7 +15,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | Runbook Operativo de Failover y Failback |
-| Versión | 1.0 |
+| Versión | 1.1 |
 | Fecha | 2026-05-12 |
 | Autor | Copilot |
 | Revisado por | [Completar] |
@@ -27,6 +27,7 @@
 | Versión | Fecha | Descripción | Autor |
 |---|---|---|---|
 | 1.0 | 2026-05-12 | Versión inicial | Copilot |
+| 1.1 | 2026-05-12 | Inclusión de controles operativos de seguridad en failover y failback | Copilot |
 
 ## Índice
 
@@ -43,7 +44,8 @@
 11. Actividades posteriores al incidente  
 12. Plan de pruebas recomendado  
 13. Evidencias a conservar  
-14. Conclusión  
+14. Controles operativos de seguridad en failover y failback  
+15. Conclusión  
 
 ## 1. Propósito
 
@@ -474,7 +476,129 @@ Cada prueba o incidente deberá conservar:
 - acciones correctivas,
 - estado final.
 
-## 14. Conclusión
+## 14. Controles operativos de seguridad en failover y failback
+
+### 14.1 Objetivo
+Esta sección define las validaciones operativas de seguridad que deben ejecutarse antes, durante y después del failover/failback para garantizar que el entorno DR mantiene los controles mínimos de identidad, cifrado, secretos, auditoría y trazabilidad.
+
+### 14.2 Checklist previo de seguridad
+Antes de ejecutar un failover, validar como mínimo:
+
+- [ ] MFA operativo para todos los accesos privilegiados a consolas de Azure, AKS, Databricks y herramientas de operación
+- [ ] Accesos privilegiados sujetos a elevación temporal o control reforzado
+- [ ] Identidades de servicio críticas inventariadas y validadas
+- [ ] No existen credenciales compartidas activas para componentes críticos
+- [ ] Azure Key Vault DR operativo y accesible
+- [ ] Secretos críticos presentes en DR
+- [ ] Certificados críticos presentes y vigentes en DR
+- [ ] Claves de cifrado disponibles para componentes que las requieran
+- [ ] Logging y auditoría activos en la región DR
+- [ ] Plataforma central de logs accesible desde DR
+- [ ] Casos de uso críticos y owners validados para modo contingencia/desastre
+- [ ] Matriz de accesos aplicable al modo operativo vigente disponible para el equipo de crisis
+
+### 14.3 Validaciones de seguridad durante el failover
+
+#### 14.3.1 Identidades y accesos
+Durante la activación de DR se deberá comprobar:
+
+- [ ] Los operadores que intervienen en la maniobra acceden con cuentas nominativas
+- [ ] MFA exigido y funcionando
+- [ ] No se habilitan cuentas genéricas como mecanismo permanente de contingencia
+- [ ] Los permisos activados durante el incidente quedan registrados
+- [ ] La segregación de funciones se mantiene en la medida de lo posible
+
+#### 14.3.2 Secretos y certificados
+Se deberá comprobar:
+
+- [ ] Las aplicaciones en DR leen secretos desde la bóveda autorizada
+- [ ] No se inyectan secretos manuales fuera de procedimiento
+- [ ] Los certificados usados por publicación/ingress son válidos
+- [ ] No existen referencias a secretos del entorno primario que impidan el arranque seguro del entorno DR
+
+#### 14.3.3 Cifrado y protección de datos
+Se deberá comprobar:
+
+- [ ] Los canales críticos de aplicación mantienen cifrado en tránsito
+- [ ] Las integraciones críticas con SQL, Storage y otros PaaS se realizan por canales cifrados
+- [ ] Los servicios que requieren claves gestionadas siguen accediendo a sus claves en DR
+- [ ] No se usan copias de datos no anonimizadas en pruebas de carga o pruebas funcionales fuera de alcance autorizado
+
+#### 14.3.4 Auditoría y monitorización
+Se deberá comprobar:
+
+- [ ] Los logs de auditoría continúan generándose en DR
+- [ ] Los eventos de acceso privilegiado quedan registrados
+- [ ] Los logs se centralizan en la plataforma corporativa
+- [ ] Las alertas críticas de seguridad siguen activas
+- [ ] Se conserva trazabilidad del cambio de modo operativo
+
+### 14.4 Criterios Go / No-Go específicos de seguridad
+
+#### Go
+Se podrá declarar entorno DR listo para operación si se cumple como mínimo:
+
+- [ ] MFA activo para accesos privilegiados
+- [ ] Acceso a Key Vault y secretos críticos operativo
+- [ ] Certificados y claves disponibles
+- [ ] Logging y auditoría activos
+- [ ] Acceso a datos y servicios por canales cifrados
+- [ ] Matriz de acceso aplicable al modo contingencia/desastre disponible y entendida por operación
+
+#### No-Go
+No se deberá abrir servicio en DR si ocurre alguno de los siguientes:
+
+- [ ] Imposibilidad de aplicar MFA a operadores privilegiados
+- [ ] Secretos críticos no disponibles o gestionados manualmente fuera de control
+- [ ] Pérdida de trazabilidad de acciones privilegiadas
+- [ ] Logs de auditoría no centralizados o no operativos
+- [ ] Uso de credenciales compartidas no autorizadas para sostener la operación
+- [ ] Incertidumbre no resuelta sobre cifrado en tránsito en flujos críticos
+
+### 14.5 Validaciones post-failover de seguridad
+Una vez abierto el servicio en DR, registrar:
+
+- [ ] Validación de acceso administrativo con MFA
+- [ ] Validación de acceso de aplicaciones mediante identidad gestionada o mecanismo aprobado
+- [ ] Validación de lectura de secretos desde la bóveda autorizada
+- [ ] Validación de publicación segura y certificados
+- [ ] Validación de logs de auditoría centralizados
+- [ ] Validación de alertas críticas de seguridad
+- [ ] Revisión de accesos elevados activados durante la contingencia
+- [ ] Confirmación de que no se han introducido excepciones temporales no documentadas
+
+### 14.6 Validaciones de seguridad para failback
+Antes del retorno a la región primaria, validar:
+
+- [ ] La región primaria vuelve a cumplir MFA y controles de acceso reforzado
+- [ ] Key Vault primario y DR están consistentes según procedimiento
+- [ ] Certificados y secretos requeridos están vigentes
+- [ ] Se mantiene trazabilidad de los cambios realizados durante DR
+- [ ] Los logs del periodo de contingencia han quedado centralizados y conservados
+- [ ] Las excepciones temporales concedidas durante DR han sido retiradas o regularizadas
+
+### 14.7 Evidencias mínimas de seguridad
+Cada simulacro o incidente deberá conservar como evidencia:
+
+- extracto de accesos privilegiados ejecutados,
+- validación de MFA,
+- validación de acceso a Key Vault,
+- validación de secretos/certificados,
+- validación de logging centralizado,
+- incidencias de seguridad detectadas,
+- excepciones aprobadas durante la contingencia,
+- acciones correctivas posteriores.
+
+### 14.8 Acciones recomendadas de mejora del runbook
+Se recomienda completar este runbook con los siguientes anexos:
+- matriz de accesos por modo operativo,
+- inventario de identidades de servicio,
+- inventario de secretos críticos,
+- inventario de certificados críticos,
+- catálogo de flujos cifrados,
+- checklist de auditoría de simulacro DR.
+
+## 15. Conclusión
 
 Este runbook proporciona una base operativa para ejecutar la recuperación hacia **Spain Central** de forma controlada, repetible y auditable.  
-Su eficacia dependerá de la automatización, la consistencia de los datos, la disponibilidad de secretos y la ejecución periódica de pruebas.
+Su eficacia dependerá de la automatización, la consistencia de los datos, la disponibilidad de secretos, la ejecución periódica de pruebas y la aplicación efectiva de los controles operativos de seguridad.
